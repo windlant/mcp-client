@@ -26,5 +26,5 @@
 # test
 test/*
 
-# config.local.yaml
-config/config.local.yaml
+# config.yaml
+config/config.yaml
