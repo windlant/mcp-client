@@ -1,41 +1,24 @@
+// internal/protocol/message.go
 package protocol
 
-import (
-	"encoding/json"
-	"strings"
-)
-
-// Message represents a single message in a conversation.
-// Compatible with DeepSeek/OpenAI chat format.
+// Message represents a chat message compatible with DeepSeek function calling.
 type Message struct {
-	Role    string `json:"role"`              // "user", "assistant", or "tool"
-	Content string `json:"content,omitempty"` // Main text or tool call JSON
-	Name    string `json:"name,omitempty"`    // Tool name (required when Role == "tool")
+	Role       string     `json:"role"`
+	Content    string     `json:"content,omitempty"`
+	Name       string     `json:"name,omitempty"`         // for tool messages
+	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`   // assistant -> tool calls
+	ToolCallID string     `json:"tool_call_id,omitempty"` // tool -> response to a call
 }
 
-// IsToolCall checks if the assistant's message contains a tool call request.
-// Expected format: {"tools": [{"name": "...", "arguments": {...}}, ...]}
-func (m *Message) IsToolCall() bool {
-	if m.Role != "assistant" {
-		return false
-	}
-	content := strings.TrimSpace(m.Content)
-	return strings.HasPrefix(content, "{") && strings.Contains(content, `"tools"`)
+// ToolCall represents a single function/tool invocation request from the model.
+type ToolCall struct {
+	ID       string   `json:"id"`
+	Type     string   `json:"type"` // must be "function"
+	Function Function `json:"function"`
 }
 
-// ExtractToolCalls parses tool calls from the assistant's response content.
-// Returns a list of tool calls, or nil if no valid tool calls are found.
-// On JSON parse error, returns an error.
-func (m *Message) ExtractToolCalls() ([]map[string]interface{}, error) {
-	if !m.IsToolCall() {
-		return nil, nil
-	}
-
-	var wrapper struct {
-		Tools []map[string]interface{} `json:"tools"`
-	}
-	if err := json.Unmarshal([]byte(m.Content), &wrapper); err != nil {
-		return nil, err
-	}
-	return wrapper.Tools, nil
+// Function describes the function to be called.
+type Function struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"` // JSON-encoded string, e.g., "{\"location\": \"Beijing\"}"
 }

@@ -3,7 +3,6 @@ package agent
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/windlant/mcp-client/internal/model"
 	"github.com/windlant/mcp-client/internal/protocol"
@@ -30,52 +29,6 @@ func NewAgent(m model.Model, maxHistory int, toolsEnabled bool) *Agent {
 		maxMessages:  maxHistory,
 		toolsEnabled: toolsEnabled,
 	}
-}
-
-func (a *Agent) buildSystemMessage() string {
-	if !a.toolsEnabled {
-		return "You are a helpful assistant."
-	}
-
-	toolDefs := a.tools.ListTools()
-	if len(toolDefs) == 0 {
-		return "You are a helpful assistant."
-	}
-
-	var b strings.Builder
-	b.WriteString("You are a helpful assistant that can use the following tools:\n\n")
-
-	for _, def := range toolDefs {
-		b.WriteString(fmt.Sprintf("Tool: %s\n", def.Name))
-		b.WriteString(fmt.Sprintf("Description: %s\n", def.Description))
-
-		if len(def.Parameters.Properties) > 0 {
-			b.WriteString("Parameters:\n")
-			for name, param := range def.Parameters.Properties {
-				requiredMark := ""
-				if param.Required {
-					requiredMark = " [required]"
-				}
-				b.WriteString(fmt.Sprintf("  - %s (%s): %s%s\n", name, param.Type, param.Description, requiredMark))
-			}
-		} else {
-			b.WriteString("Parameters: none\n")
-		}
-		b.WriteString("\n")
-	}
-
-	b.WriteString(`When you need to use a tool, respond ONLY with a JSON object in this exact format:
-{
-  "tools": [
-    {
-      "name": "<tool_name>",
-      "arguments": {<key>: <value>, ...}
-    }
-  ]
-}
-Do not include any other text or explanation.`)
-
-	return b.String()
 }
 
 func (a *Agent) trimHistory() {
@@ -112,7 +65,7 @@ func (a *Agent) Chat(input string) (string, error) {
 	if len(a.history) == 0 {
 		systemMsg := protocol.Message{
 			Role:    "system",
-			Content: a.buildSystemMessage(),
+			Content: "You are a helpful assistant.",
 		}
 		a.history = append(a.history, systemMsg)
 	}
@@ -121,95 +74,132 @@ func (a *Agent) Chat(input string) (string, error) {
 		Role:    "user",
 		Content: input,
 	})
-
 	a.trimHistory()
 
-	maxRounds := 5
+	// Get tool definitions for API
+	var apiTools []model.ToolForAPI
+	if a.toolsEnabled {
+		defs := a.tools.ListTools()
+		apiTools = convertToolDefsToAPI(defs)
+	}
+
+	// fmt.Printf("工具列表: apiTools:%#v\n", apiTools)
+
+	// Call model with tools support
+
+	maxRounds := 3
 	for round := 0; round < maxRounds; round++ {
-		responseText, err := a.model.Chat(a.history)
+		var content string
+		var toolCalls []protocol.ToolCall
+		var err error
+
+		content, toolCalls, err = a.model.ChatWithTools(a.history, apiTools)
 		if err != nil {
 			return "", fmt.Errorf("model call failed: %w", err)
 		}
-
+		// Build assistant message
 		assistantMsg := protocol.Message{
-			Role:    "assistant",
-			Content: responseText,
+			Role:      "assistant",
+			Content:   content,
+			ToolCalls: toolCalls,
 		}
 		a.history = append(a.history, assistantMsg)
 		a.trimHistory()
 
-		if !a.isValidToolCallFormat(responseText) {
-			return responseText, nil
+		// If no tool calls, return final answer
+		if len(toolCalls) == 0 {
+			return content, nil
 		}
 
-		var wrapper struct {
-			Tools []struct {
-				Name      string                 `json:"name"`
-				Arguments map[string]interface{} `json:"arguments"`
-			} `json:"tools"`
-		}
-
-		if err := json.Unmarshal([]byte(responseText), &wrapper); err != nil {
-			return responseText, nil
-		}
-
-		var hasError bool
-		for _, call := range wrapper.Tools {
-			def, ok := a.tools.GetDefinition(call.Name)
+		// fmt.Printf("工具调用: tool_call:%#v\n", toolCalls)
+		// fmt.Printf("工具调用: content:%#v\n", content)
+		// Execute each tool call
+		for _, tc := range toolCalls {
+			def, ok := a.tools.GetDefinition(tc.Function.Name)
 			if !ok {
-				hasError = true
+				// Report error as tool message
 				a.history = append(a.history, protocol.Message{
-					Role:    "tool",
-					Name:    call.Name,
-					Content: fmt.Sprintf("Error: tool '%s' not found", call.Name),
+					Role:       "tool",
+					Name:       tc.Function.Name,
+					ToolCallID: tc.ID,
+					Content:    "Error: tool not found",
 				})
 				continue
 			}
 
-			result, err := def.Function(tools.ToolArguments(call.Arguments))
-			if err != nil {
-				hasError = true
+			// Parse arguments (tc.Function.Arguments is a JSON string)
+			var args tools.ToolArguments
+			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 				a.history = append(a.history, protocol.Message{
-					Role:    "tool",
-					Name:    call.Name,
-					Content: fmt.Sprintf("Error: %v", err),
+					Role:       "tool",
+					Name:       tc.Function.Name,
+					ToolCallID: tc.ID,
+					Content:    "Error: invalid arguments JSON",
+				})
+				continue
+			}
+
+			result, err := def.Function(args)
+			if err != nil {
+				a.history = append(a.history, protocol.Message{
+					Role:       "tool",
+					Name:       tc.Function.Name,
+					ToolCallID: tc.ID,
+					Content:    "Error: " + err.Error(),
 				})
 				continue
 			}
 
 			a.history = append(a.history, protocol.Message{
-				Role:    "tool",
-				Name:    call.Name,
-				Content: result,
+				Role:       "tool",
+				Name:       tc.Function.Name,
+				ToolCallID: tc.ID,
+				Content:    result,
 			})
 		}
 		a.trimHistory()
-
-		if hasError {
-			continue
-		}
 	}
 
-	lastMsg := a.history[len(a.history)-1]
-	if a.isValidToolCallFormat(lastMsg.Content) {
-		errMsg := "Error: Maximum tool call depth exceeded. Please simplify your request."
-		return errMsg, nil
+	// After max rounds, return last content
+	last := a.history[len(a.history)-1]
+	if last.Role == "assistant" && len(last.ToolCalls) > 0 {
+		return "Error: Maximum tool call depth exceeded.", nil
 	}
-
-	return lastMsg.Content, nil
-}
-
-func (a *Agent) isValidToolCallFormat(content string) bool {
-	content = strings.TrimSpace(content)
-	if !strings.HasPrefix(content, "{") || !strings.Contains(content, `"tools"`) {
-		return false
-	}
-	var tmp struct {
-		Tools interface{} `json:"tools"`
-	}
-	return json.Unmarshal([]byte(content), &tmp) == nil
+	return last.Content, nil
 }
 
 func (a *Agent) ClearHistory() {
 	a.history = make([]protocol.Message, 0)
+}
+
+func convertToolDefsToAPI(defs []tools.ToolDefinition) []model.ToolForAPI {
+	apiTools := make([]model.ToolForAPI, len(defs))
+	for i, def := range defs {
+		// Convert ToolSchema to JSON Schema object
+		props := make(map[string]interface{})
+		for name, param := range def.Parameters.Properties {
+			props[name] = map[string]interface{}{
+				"type":        param.Type,
+				"description": param.Description,
+			}
+		}
+
+		schema := map[string]interface{}{
+			"type":       "object",
+			"properties": props,
+		}
+		if len(def.Parameters.Required) > 0 {
+			schema["required"] = def.Parameters.Required
+		}
+
+		apiTools[i] = model.ToolForAPI{
+			Type: "function",
+			Function: model.ToolFuncDef{
+				Name:        def.Name,
+				Description: def.Description,
+				Parameters:  schema,
+			},
+		}
+	}
+	return apiTools
 }
