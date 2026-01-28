@@ -2,26 +2,29 @@ package registry
 
 import "github.com/windlant/mcp-client/internal/tools"
 
-// Registry stores and manages available tools by name.
 type Registry struct {
-	tools map[string]tools.ToolFunc
+	tools map[string]tools.ToolDefinition
 }
 
-// NewRegistry creates a new empty tool registry.
 func NewRegistry() *Registry {
 	return &Registry{
-		tools: make(map[string]tools.ToolFunc),
+		tools: make(map[string]tools.ToolDefinition),
 	}
 }
 
-// Register adds a tool function to the registry under the given name.
-func (r *Registry) Register(name string, fn tools.ToolFunc) {
-	r.tools[name] = fn
+func (r *Registry) Register(def tools.ToolDefinition) {
+	r.tools[def.Name] = def
 }
 
-// Get retrieves a tool function by name.
-// Returns the function and true if found; otherwise returns nil and false.
-func (r *Registry) Get(name string) (tools.ToolFunc, bool) {
-	fn, ok := r.tools[name]
-	return fn, ok
+func (r *Registry) Get(name string) (tools.ToolDefinition, bool) {
+	def, ok := r.tools[name]
+	return def, ok
+}
+
+func (r *Registry) ListAll() []tools.ToolDefinition {
+	defs := make([]tools.ToolDefinition, 0, len(r.tools))
+	for _, def := range r.tools {
+		defs = append(defs, def)
+	}
+	return defs
 }

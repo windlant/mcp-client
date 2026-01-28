@@ -7,13 +7,13 @@ import (
 )
 
 type Config struct {
-	APIKey  string        `yaml:"api_key"`
 	Model   ModelConfig   `yaml:"model"`
 	Context ContextConfig `yaml:"context"`
 	Tools   ToolsConfig   `yaml:"tools"`
 }
 
 type ModelConfig struct {
+	APIKey      string  `yaml:"api_key"`
 	Provider    string  `yaml:"provider"`
 	ModelName   string  `yaml:"model_name"`
 	Temperature float32 `yaml:"temperature"`
@@ -28,13 +28,32 @@ type ToolsConfig struct {
 	Enabled bool `yaml:"enabled"`
 }
 
-// Load 从 config/config.yaml 加载配置
 func Load() (*Config, error) {
 	data, err := os.ReadFile("config/config.yaml")
 	if err != nil {
 		return nil, err
 	}
+
 	var cfg Config
-	err = yaml.Unmarshal(data, &cfg)
-	return &cfg, err
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, err
+	}
+
+	if cfg.Context.MaxHistory <= 0 {
+		cfg.Context.MaxHistory = 20
+	}
+	if cfg.Model.Temperature == 0 {
+		cfg.Model.Temperature = 0.7
+	}
+	if cfg.Model.MaxTokens == 0 {
+		cfg.Model.MaxTokens = 1024
+	}
+	if cfg.Model.Provider == "" {
+		cfg.Model.Provider = "deepseek"
+	}
+	if cfg.Model.ModelName == "" {
+		cfg.Model.ModelName = "deepseek-chat"
+	}
+
+	return &cfg, nil
 }

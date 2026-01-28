@@ -26,5 +26,8 @@
 # test
 test/*
 
-# config.yaml
+# config
 config/config.yaml
+
+# Build artifacts
+mcp-client

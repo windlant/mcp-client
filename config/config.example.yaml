@@ -1,17 +1,12 @@
-# Model settings
 model:
   provider: "deepseek"
+  api_key: "your_deepseek_api_key_here"
   model_name: "deepseek-chat"
   temperature: 0.7
   max_tokens: 1024
 
-# Context management
 context:
-  max_history: 10  # 最多保留 10 轮对话（用户+AI 为 1 轮）
+  max_history: 20
 
-# Tool settings (预留)
 tools:
   enabled: true
-
-# API Key will be loaded from config.local.yaml
-# api_key: ""
