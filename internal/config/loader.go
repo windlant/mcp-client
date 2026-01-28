@@ -25,7 +25,8 @@ type ContextConfig struct {
 }
 
 type ToolsConfig struct {
-	Enabled bool `yaml:"enabled"`
+	Enabled bool   `yaml:"enabled"`
+	Mode    string `yaml:"mode"`
 }
 
 func Load() (*Config, error) {

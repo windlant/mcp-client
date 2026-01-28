@@ -1,11 +1,12 @@
+// internal/tools/local/local.go
 package local
 
 import (
 	"fmt"
 
 	"github.com/windlant/mcp-client/internal/tools"
-	"github.com/windlant/mcp-client/internal/tools/local/builtin"
-	"github.com/windlant/mcp-client/internal/tools/local/registry"
+	"github.com/windlant/mcp-client/internal/tools/manage/builtin"
+	"github.com/windlant/mcp-client/internal/tools/manage/registry"
 )
 
 type LocalToolClient struct {
@@ -26,8 +27,12 @@ func (c *LocalToolClient) Call(name string, args tools.ToolArguments) (string, e
 	return def.Function(args)
 }
 
-func (c *LocalToolClient) ListTools() []tools.ToolDefinition {
-	return c.registry.ListAll()
+func (c *LocalToolClient) List() ([]tools.ToolDefinition, error) {
+	return c.registry.ListAll(), nil
+}
+
+func (c *LocalToolClient) Close() error {
+	return nil
 }
 
 func (c *LocalToolClient) GetDefinition(name string) (tools.ToolDefinition, bool) {

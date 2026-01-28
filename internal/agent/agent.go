@@ -1,3 +1,4 @@
+// internal/agent/agent.go
 package agent
 
 import (
@@ -7,30 +8,35 @@ import (
 	"github.com/windlant/mcp-client/internal/model"
 	"github.com/windlant/mcp-client/internal/protocol"
 	"github.com/windlant/mcp-client/internal/tools"
-	"github.com/windlant/mcp-client/internal/tools/local"
 )
 
 type Agent struct {
 	model        model.Model
-	tools        *local.LocalToolClient
+	toolClient   tools.ToolClient
 	history      []protocol.Message
 	maxMessages  int
 	toolsEnabled bool
 }
 
-func NewAgent(m model.Model, maxHistory int, toolsEnabled bool) *Agent {
+// NewAgent creates a new agent.
+// toolClient can be nil if tools are disabled; a NoopToolClient will be used internally.
+func NewAgent(m model.Model, maxHistory int, toolsEnabled bool, toolClient tools.ToolClient) *Agent {
 	if maxHistory <= 0 {
 		maxHistory = 20
 	}
+	if toolClient == nil {
+		toolClient = &tools.NoopToolClient{}
+	}
 	return &Agent{
 		model:        m,
-		tools:        local.NewLocalToolClient(),
+		toolClient:   toolClient,
 		history:      make([]protocol.Message, 0),
 		maxMessages:  maxHistory,
 		toolsEnabled: toolsEnabled,
 	}
 }
 
+// trimHistory keeps the conversation within maxMessages (excluding system message).
 func (a *Agent) trimHistory() {
 	if len(a.history) == 0 {
 		return
@@ -61,6 +67,7 @@ func (a *Agent) trimHistory() {
 	}
 }
 
+// Chat handles a user input and returns the assistant's response.
 func (a *Agent) Chat(input string) (string, error) {
 	if len(a.history) == 0 {
 		systemMsg := protocol.Message{
@@ -79,14 +86,16 @@ func (a *Agent) Chat(input string) (string, error) {
 	// Get tool definitions for API
 	var apiTools []model.ToolForAPI
 	if a.toolsEnabled {
-		defs := a.tools.ListTools()
-		apiTools = convertToolDefsToAPI(defs)
+		defs, err := a.toolClient.List()
+		// fmt.Printf("提供了工具：%#v\n", defs)
+		if err != nil {
+			return "", fmt.Errorf("failed to list tools: %w", err)
+		} else {
+			apiTools = convertToolDefsToAPI(defs)
+		}
 	}
 
-	// fmt.Printf("工具列表: apiTools:%#v\n", apiTools)
-
 	// Call model with tools support
-
 	maxRounds := 3
 	for round := 0; round < maxRounds; round++ {
 		var content string
@@ -97,6 +106,7 @@ func (a *Agent) Chat(input string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("model call failed: %w", err)
 		}
+
 		// Build assistant message
 		assistantMsg := protocol.Message{
 			Role:      "assistant",
@@ -111,24 +121,10 @@ func (a *Agent) Chat(input string) (string, error) {
 			return content, nil
 		}
 
-		// fmt.Printf("工具调用: tool_call:%#v\n", toolCalls)
-		// fmt.Printf("工具调用: content:%#v\n", content)
 		// Execute each tool call
 		for _, tc := range toolCalls {
-			def, ok := a.tools.GetDefinition(tc.Function.Name)
-			if !ok {
-				// Report error as tool message
-				a.history = append(a.history, protocol.Message{
-					Role:       "tool",
-					Name:       tc.Function.Name,
-					ToolCallID: tc.ID,
-					Content:    "Error: tool not found",
-				})
-				continue
-			}
-
 			// Parse arguments (tc.Function.Arguments is a JSON string)
-			var args tools.ToolArguments
+			var args map[string]interface{}
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 				a.history = append(a.history, protocol.Message{
 					Role:       "tool",
@@ -139,7 +135,7 @@ func (a *Agent) Chat(input string) (string, error) {
 				continue
 			}
 
-			result, err := def.Function(args)
+			result, err := a.toolClient.Call(tc.Function.Name, args)
 			if err != nil {
 				a.history = append(a.history, protocol.Message{
 					Role:       "tool",
@@ -175,7 +171,6 @@ func (a *Agent) ClearHistory() {
 func convertToolDefsToAPI(defs []tools.ToolDefinition) []model.ToolForAPI {
 	apiTools := make([]model.ToolForAPI, len(defs))
 	for i, def := range defs {
-		// Convert ToolSchema to JSON Schema object
 		props := make(map[string]interface{})
 		for name, param := range def.Parameters.Properties {
 			props[name] = map[string]interface{}{

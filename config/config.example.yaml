@@ -10,3 +10,4 @@ context:
 
 tools:
   enabled: true
+  mode: "local"

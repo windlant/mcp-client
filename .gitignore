@@ -31,3 +31,4 @@ config/config.yaml
 
 # Build artifacts
 mcp-client
+cmd/mcp_server_local/mcp-server-local

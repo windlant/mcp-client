@@ -1,7 +1,9 @@
+// cmd/mcp_client/main.go
 package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -9,6 +11,9 @@ import (
 	"github.com/windlant/mcp-client/internal/agent"
 	"github.com/windlant/mcp-client/internal/config"
 	"github.com/windlant/mcp-client/internal/model"
+	"github.com/windlant/mcp-client/internal/tools"
+	"github.com/windlant/mcp-client/internal/tools/local"
+	"github.com/windlant/mcp-client/internal/tools/stdio"
 )
 
 func main() {
@@ -25,11 +30,47 @@ func main() {
 		os.Exit(1)
 	}
 
-	a := agent.NewAgent(m, cfg.Context.MaxHistory, cfg.Tools.Enabled)
+	var tc tools.ToolClient
+
+	if cfg.Tools.Enabled {
+		switch cfg.Tools.Mode {
+		case "local":
+			tc = local.NewLocalToolClient()
+			fmt.Println("Using local tool client (direct function calls).")
+
+		case "stdio":
+			serverBinary := "./cmd/mcp_server_local/mcp-server-local"
+			tc, err = stdio.NewStdioToolClient(serverBinary)
+			if err != nil {
+				log.Fatalf("Failed to start stdio tool client: %v", err)
+			}
+			defer func() {
+				if closeErr := tc.Close(); closeErr != nil {
+					// log.Printf("Error closing stdio client: %v", closeErr)
+				}
+			}()
+			// sigCh := make(chan os.Signal, 1)
+			// signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+			// go func() {
+			// 	<-sigCh
+			// 	fmt.Println("\nShutting down MCP server...")
+			// 	if err := tc.Close(); err != nil {
+			// 		log.Printf("Warning: failed to close stdio client: %v", err)
+			// 	}
+			// 	os.Exit(0)
+			// }()
+			fmt.Println("Using stdio tool client (subprocess MCP server).")
+
+		default:
+			log.Fatalf("Unsupported tool mode: %s. Supported: local, stdio", cfg.Tools.Mode)
+		}
+	}
+
+	a := agent.NewAgent(m, cfg.Context.MaxHistory, cfg.Tools.Enabled, tc)
 
 	fmt.Println("MCP Client started!")
 	if cfg.Tools.Enabled {
-		fmt.Println("Tool calling: enabled")
+		fmt.Printf("Tool calling: enabled (mode: %s)\n", cfg.Tools.Mode)
 	} else {
 		fmt.Println("Tool calling: disabled")
 	}
