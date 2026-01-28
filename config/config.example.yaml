@@ -10,4 +10,4 @@ context:
 
 tools:
   enabled: true
-  mode: "local"
+  mode: "local" # 使用 "local" 或 "stdio"；"remote" 尚未实现

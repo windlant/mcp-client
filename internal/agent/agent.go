@@ -1,4 +1,3 @@
-// internal/agent/agent.go
 package agent
 
 import (
@@ -10,22 +9,23 @@ import (
 	"github.com/windlant/mcp-client/internal/tools"
 )
 
+// Agent 是智能对话代理，负责管理对话历史、调用模型和工具
 type Agent struct {
-	model        model.Model
-	toolClient   tools.ToolClient
-	history      []protocol.Message
-	maxMessages  int
-	toolsEnabled bool
+	model        model.Model        // 使用的语言模型
+	toolClient   tools.ToolClient   // 工具客户端（用于调用外部功能）
+	history      []protocol.Message // 对话历史记录
+	maxMessages  int                // 最大保存的历史消息数（不含 system 消息）
+	toolsEnabled bool               // 是否启用工具调用功能
 }
 
-// NewAgent creates a new agent.
-// toolClient can be nil if tools are disabled; a NoopToolClient will be used internally.
+// NewAgent 创建一个新的智能代理
+// 如果禁用了工具，toolClient 可以为 nil，内部会自动使用空操作客户端
 func NewAgent(m model.Model, maxHistory int, toolsEnabled bool, toolClient tools.ToolClient) *Agent {
 	if maxHistory <= 0 {
-		maxHistory = 20
+		maxHistory = 20 // 默认最多保留 20 条消息
 	}
 	if toolClient == nil {
-		toolClient = &tools.NoopToolClient{}
+		toolClient = &tools.NoopToolClient{} // 使用空工具客户端避免空指针
 	}
 	return &Agent{
 		model:        m,
@@ -36,12 +36,13 @@ func NewAgent(m model.Model, maxHistory int, toolsEnabled bool, toolClient tools
 	}
 }
 
-// trimHistory keeps the conversation within maxMessages (excluding system message).
+// trimHistory 修剪对话历史，确保不超过最大消息数（system 消息除外）
 func (a *Agent) trimHistory() {
 	if len(a.history) == 0 {
 		return
 	}
 
+	// 先找 system 消息的位置
 	systemIdx := -1
 	for i, msg := range a.history {
 		if msg.Role == "system" {
@@ -50,15 +51,18 @@ func (a *Agent) trimHistory() {
 		}
 	}
 
+	// 分离出非 system 的消息
 	nonSystemMsgs := a.history
 	if systemIdx >= 0 {
 		nonSystemMsgs = a.history[systemIdx+1:]
 	}
 
+	// 如果非 system 消息太多，就截断
 	if len(nonSystemMsgs) > a.maxMessages {
 		keepStart := len(nonSystemMsgs) - a.maxMessages
 		trimmed := nonSystemMsgs[keepStart:]
 
+		// 重新组合：保留 system + 最新的消息
 		if systemIdx >= 0 {
 			a.history = append([]protocol.Message{a.history[systemIdx]}, trimmed...)
 		} else {
@@ -67,8 +71,10 @@ func (a *Agent) trimHistory() {
 	}
 }
 
-// Chat handles a user input and returns the assistant's response.
+// Chat 处理用户输入并返回助手的回复
+// 支持多轮工具调用（最多 3 轮）
 func (a *Agent) Chat(input string) (string, error) {
+	// 如果是第一次对话，添加 system 提示
 	if len(a.history) == 0 {
 		systemMsg := protocol.Message{
 			Role:    "system",
@@ -77,17 +83,17 @@ func (a *Agent) Chat(input string) (string, error) {
 		a.history = append(a.history, systemMsg)
 	}
 
+	// 添加用户消息
 	a.history = append(a.history, protocol.Message{
 		Role:    "user",
 		Content: input,
 	})
 	a.trimHistory()
 
-	// Get tool definitions for API
+	// 获取工具定义（如果启用了工具）
 	var apiTools []model.ToolForAPI
 	if a.toolsEnabled {
 		defs, err := a.toolClient.List()
-		// fmt.Printf("提供了工具：%#v\n", defs)
 		if err != nil {
 			return "", fmt.Errorf("failed to list tools: %w", err)
 		} else {
@@ -95,19 +101,20 @@ func (a *Agent) Chat(input string) (string, error) {
 		}
 	}
 
-	// Call model with tools support
-	maxRounds := 3
+	// 最多进行 5 轮工具调用（防止无限循环）
+	maxRounds := 5
 	for round := 0; round < maxRounds; round++ {
 		var content string
 		var toolCalls []protocol.ToolCall
 		var err error
 
+		// 调用模型，可能返回文本内容或工具调用请求
 		content, toolCalls, err = a.model.ChatWithTools(a.history, apiTools)
 		if err != nil {
-			return "", fmt.Errorf("model call failed: %w", err)
+			return "", fmt.Errorf("failed to call model: %w", err)
 		}
 
-		// Build assistant message
+		// 构造助手的回复消息（可能包含工具调用）
 		assistantMsg := protocol.Message{
 			Role:      "assistant",
 			Content:   content,
@@ -116,16 +123,17 @@ func (a *Agent) Chat(input string) (string, error) {
 		a.history = append(a.history, assistantMsg)
 		a.trimHistory()
 
-		// If no tool calls, return final answer
+		// 如果没有工具调用，直接返回最终答案
 		if len(toolCalls) == 0 {
 			return content, nil
 		}
 
-		// Execute each tool call
+		// 执行每个工具调用
 		for _, tc := range toolCalls {
-			// Parse arguments (tc.Function.Arguments is a JSON string)
+			// 解析工具参数（JSON 字符串转为 map）
 			var args map[string]interface{}
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+				// 参数解析失败，记录错误
 				a.history = append(a.history, protocol.Message{
 					Role:       "tool",
 					Name:       tc.Function.Name,
@@ -135,8 +143,10 @@ func (a *Agent) Chat(input string) (string, error) {
 				continue
 			}
 
+			// 调用工具
 			result, err := a.toolClient.Call(tc.Function.Name, args)
 			if err != nil {
+				// 工具执行失败，记录错误
 				a.history = append(a.history, protocol.Message{
 					Role:       "tool",
 					Name:       tc.Function.Name,
@@ -146,6 +156,7 @@ func (a *Agent) Chat(input string) (string, error) {
 				continue
 			}
 
+			// 工具成功执行，记录结果
 			a.history = append(a.history, protocol.Message{
 				Role:       "tool",
 				Name:       tc.Function.Name,
@@ -156,7 +167,7 @@ func (a *Agent) Chat(input string) (string, error) {
 		a.trimHistory()
 	}
 
-	// After max rounds, return last content
+	// 超过最大轮数仍未完成，返回错误提示
 	last := a.history[len(a.history)-1]
 	if last.Role == "assistant" && len(last.ToolCalls) > 0 {
 		return "Error: Maximum tool call depth exceeded.", nil
@@ -164,13 +175,16 @@ func (a *Agent) Chat(input string) (string, error) {
 	return last.Content, nil
 }
 
+// ClearHistory 清空对话历史（重置上下文）
 func (a *Agent) ClearHistory() {
 	a.history = make([]protocol.Message, 0)
 }
 
+// convertToolDefsToAPI 将内部工具定义转换为模型 API 所需的格式
 func convertToolDefsToAPI(defs []tools.ToolDefinition) []model.ToolForAPI {
 	apiTools := make([]model.ToolForAPI, len(defs))
 	for i, def := range defs {
+		// 构建参数属性
 		props := make(map[string]interface{})
 		for name, param := range def.Parameters.Properties {
 			props[name] = map[string]interface{}{
@@ -179,6 +193,7 @@ func convertToolDefsToAPI(defs []tools.ToolDefinition) []model.ToolForAPI {
 			}
 		}
 
+		// 构建完整的 JSON Schema
 		schema := map[string]interface{}{
 			"type":       "object",
 			"properties": props,
@@ -187,6 +202,7 @@ func convertToolDefsToAPI(defs []tools.ToolDefinition) []model.ToolForAPI {
 			schema["required"] = def.Parameters.Required
 		}
 
+		// 转换为模型所需的工具格式
 		apiTools[i] = model.ToolForAPI{
 			Type: "function",
 			Function: model.ToolFuncDef{

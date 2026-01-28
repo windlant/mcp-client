@@ -1,29 +1,29 @@
 package tools
 
-// ToolArguments represents the input parameters for a tool call.
+// ToolArguments 表示工具调用的输入参数
 type ToolArguments map[string]interface{}
 
-// ToolFunc is the function signature that all tool implementations must follow.
+// ToolFunc 是所有工具实现必须遵循的函数签名
 type ToolFunc func(ToolArguments) (string, error)
 
-// ToolParameter describes a single parameter of a tool.
+// ToolParameter 描述工具的一个参数
 type ToolParameter struct {
-	Type        string `json:"type"`        // e.g., "string", "number", "object"
-	Description string `json:"description"` // What this parameter is for
-	Required    bool   `json:"required"`    // Whether this parameter is required
+	Type        string `json:"type"`        // 例如 "string"、"number"、"object"
+	Description string `json:"description"` // 参数用途说明
+	Required    bool   `json:"required"`    // 该参数是否必需（仅用于文档，实际 required 列表在 Schema 中）
 }
 
-// ToolSchema describes the expected input structure of a tool.
+// ToolSchema 描述工具期望的输入结构（遵循 JSON Schema 规范）
 type ToolSchema struct {
-	Type       string                   `json:"type"`       // Usually "object"
-	Properties map[string]ToolParameter `json:"properties"` // Parameter definitions
-	Required   []string                 `json:"required"`   // List of required param names
+	Type       string                   `json:"type"`       // 通常为 "object"
+	Properties map[string]ToolParameter `json:"properties"` // 参数定义
+	Required   []string                 `json:"required"`   // 必需参数的名称列表
 }
 
-// ToolDefinition contains all metadata needed for an LLM to use a tool.
+// ToolDefinition 包含 LLM 使用工具所需的全部元数据
 type ToolDefinition struct {
 	Name        string     `json:"name"`
 	Description string     `json:"description"`
 	Parameters  ToolSchema `json:"parameters"`
-	Function    ToolFunc   `json:"-"` // Not serialized; used only locally
+	Function    ToolFunc   `json:"-"` // 不参与 JSON 序列化，仅在本地执行时使用
 }

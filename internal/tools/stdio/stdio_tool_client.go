@@ -4,25 +4,27 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
+	"time"
 
 	"github.com/windlant/mcp-client/internal/protocol"
 	"github.com/windlant/mcp-client/internal/tools"
 )
 
+// StdioToolClient 通过子进程的 stdin/stdout 与 MCP 工具服务器通信
 type StdioToolClient struct {
 	cmd    *exec.Cmd
 	stdin  *json.Encoder
 	stdout *bufio.Scanner
-	mu     sync.Mutex // ensure thread-safe calls
+	mu     sync.Mutex // 确保请求-响应交互是线程安全的，之后可能有多个client通过stdio访问server
 }
 
-// NewStdioToolClient starts the mcp-server-local subprocess and sets up communication.
+// NewStdioToolClient 启动一个 MCP 服务器子进程，并建立通信管道
 func NewStdioToolClient(serverBinary string) (*StdioToolClient, error) {
 	cmd := exec.Command(serverBinary)
 
-	// Create pipes
 	stdinPipe, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create stdin pipe: %w", err)
@@ -32,7 +34,6 @@ func NewStdioToolClient(serverBinary string) (*StdioToolClient, error) {
 		return nil, fmt.Errorf("failed to create stdout pipe: %w", err)
 	}
 
-	// Start the subprocess
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("failed to start server process: %w", err)
 	}
@@ -43,11 +44,10 @@ func NewStdioToolClient(serverBinary string) (*StdioToolClient, error) {
 		stdout: bufio.NewScanner(stdoutPipe),
 	}
 
-	// Optionally: verify server is ready? (We assume it responds immediately)
 	return client, nil
 }
 
-// sendRequest sends a request and reads one line of response.
+// sendRequest 向子进程发送请求并等待单行 JSON 响应（NDJSON 格式）
 func (c *StdioToolClient) sendRequest(req interface{}) ([]byte, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -67,7 +67,7 @@ func (c *StdioToolClient) sendRequest(req interface{}) ([]byte, error) {
 	return nil, fmt.Errorf("server closed stdout unexpectedly")
 }
 
-// Call invokes a tool by name with arguments.
+// Call 调用指定名称的工具，并传入参数
 func (c *StdioToolClient) Call(name string, args tools.ToolArguments) (string, error) {
 	req := protocol.MCPToolCallRequest{
 		Method: protocol.MCPMethodCallTool,
@@ -92,7 +92,7 @@ func (c *StdioToolClient) Call(name string, args tools.ToolArguments) (string, e
 	return resp.Result, nil
 }
 
-// List retrieves all available tools from the server.
+// List 获取服务器支持的所有工具定义
 func (c *StdioToolClient) List() ([]tools.ToolDefinition, error) {
 	req := protocol.MCPListToolsRequest{
 		Method: protocol.MCPMethodListTools,
@@ -107,14 +107,29 @@ func (c *StdioToolClient) List() ([]tools.ToolDefinition, error) {
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, fmt.Errorf("failed to parse list_tools response: %w", err)
 	}
-	// fmt.Printf("返回的工具：%#v\n", resp)
 
 	return resp.Tools, nil
 }
 
+// Close 优雅关闭子进程：先发送中断信号，超时后强制终止
 func (c *StdioToolClient) Close() error {
-	if c.cmd.Process != nil {
-		_ = c.cmd.Process.Kill()
+	if c.cmd.Process == nil {
+		return nil
 	}
-	return c.cmd.Wait()
+
+	_ = c.cmd.Process.Signal(os.Interrupt)
+
+	done := make(chan error, 1)
+	go func() {
+		done <- c.cmd.Wait()
+	}()
+
+	select {
+	case <-done:
+		return nil
+	case <-time.After(2 * time.Second):
+		_ = c.cmd.Process.Kill()
+		_ = c.cmd.Wait()
+		return nil
+	}
 }
