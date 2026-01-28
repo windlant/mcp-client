@@ -14,4 +14,4 @@ tools:
   enabled: true
 
 # API Key will be loaded from config.local.yaml
-api_key: "sk-c36cae12f87d41e2aa90c9e4ddf86b01"
+# api_key: ""
