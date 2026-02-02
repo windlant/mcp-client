@@ -1,10 +1,3 @@
-**核心思想：**
-将“模型调用”抽象为一个带上下文（Context）的 RPC 调用，支持：
-  多轮对话状态保持
-  工具/函数注册与调用（Tool Use）
-  上下文自动裁剪（Token Limit）
-  异步响应（流式/非流式）
-**典型使用场景：**
-  智能客服机器人（需记住用户历史）
-  AI 编程助手（调用文件读写、执行命令）
-  数据分析 Agent（调用数据库、绘图工具）
+○完成了mcp-client，能初步作为单agent使用，实现了上下文窗口管理，tools调用功能
+○并设计了统一的tools_client接口以调用mcp-server，在此接口上实现了两种mcp-server（client本地集成工具调用、子进程mcp-server通过stdio调用），预留了http远程调用mcp-server接口
+○基于go-http实现与Deepseek的数据传输，并根据MCP设计了相关数据结构完成对mcp-server的工具调用
