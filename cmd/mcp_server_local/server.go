@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/windlant/mcp-client/internal/tools/manage/builtin"
 	"github.com/windlant/mcp-client/internal/tools/manage/registry"
 	"github.com/windlant/protocol/protocol/mcp_protocol"
 	"github.com/windlant/protocol/types/tools_types"
@@ -18,7 +17,7 @@ type Server struct {
 // NewServer 创建一个新的 MCP 服务器实例
 func NewServer() *Server {
 	reg := registry.NewRegistry()
-	reg.Register(builtin.GetTimeToolDef)
+	// reg.Register(builtin.GetTimeToolDef)
 
 	// 在这里可以注册其他专属于服务器的工具
 	// reg.Register(someOtherToolDef)

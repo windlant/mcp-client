@@ -14,15 +14,18 @@ import (
 
 // RemoteToolClient 通过 HTTP 与远程 MCP 服务器通信
 type RemoteToolClient struct {
-	url    string
-	client *http.Client
+	url     string
+	agentID string // 新增：Agent ID 用于权限控制
+	client  *http.Client
 }
 
 // NewRemoteToolClient 创建一个新的远程工具客户端
 // url 参数应该是完整的 MCP 服务器端点 URL，例如 "http://localhost:44444/mcp"
-func NewRemoteToolClient(url string) *RemoteToolClient {
+// agentID 是当前 Agent 的唯一标识符，用于 MCP 服务器的权限控制
+func NewRemoteToolClient(url string, agentID string) *RemoteToolClient {
 	return &RemoteToolClient{
-		url: url,
+		url:     url,
+		agentID: agentID,
 		client: &http.Client{
 			Timeout: 30 * time.Second, // 设置合理的超时时间
 		},
@@ -32,9 +35,10 @@ func NewRemoteToolClient(url string) *RemoteToolClient {
 // Call 调用指定名称的远程工具，并传入参数
 func (c *RemoteToolClient) Call(name string, args tools_types.ToolArguments) (string, error) {
 	req := mcp_protocol.MCPToolCallRequest{
-		Method: mcp_protocol.MCPMethodCallTool,
-		Name:   name,
-		Args:   args,
+		Method:  mcp_protocol.MCPMethodCallTool,
+		Name:    name,
+		Args:    args,
+		AgentID: c.agentID, // 添加 agent_id 到请求中
 	}
 
 	respBytes, err := c.sendRequest(req)
@@ -57,7 +61,8 @@ func (c *RemoteToolClient) Call(name string, args tools_types.ToolArguments) (st
 // List 获取远程服务器支持的所有工具定义
 func (c *RemoteToolClient) List() ([]tools_types.ToolDefinition, error) {
 	req := mcp_protocol.MCPListToolsRequest{
-		Method: mcp_protocol.MCPMethodListTools,
+		Method:  mcp_protocol.MCPMethodListTools,
+		AgentID: c.agentID, // 添加 agent_id 到请求中
 	}
 
 	respBytes, err := c.sendRequest(req)

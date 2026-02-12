@@ -6,6 +6,16 @@ github.com/windlant/protocol v0.0.0-20260212021342-7a1d25f1f80e h1:IR0RH0f8//DNR
 github.com/windlant/protocol v0.0.0-20260212021342-7a1d25f1f80e/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
 github.com/windlant/protocol v1.2.0 h1:4VqI1kLkzf5/f18LhWu5av7alyX/WGuTdRWnPmdKfIk=
 github.com/windlant/protocol v1.2.0/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
+github.com/windlant/protocol v1.2.1 h1:Uclpjm2hMjYcA7yLU8pBoHauXw84vbhouhBd6GVdRF8=
+github.com/windlant/protocol v1.2.1/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
+github.com/windlant/protocol v1.2.2 h1:yWRJvTwAdatKFdnXGKM92brOnVQiaKjzQO5s/IsXsuA=
+github.com/windlant/protocol v1.2.2/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
+github.com/windlant/protocol v1.2.3 h1:glyyTiK+n0N2+QmFOGbXU/uBh1Wzxbim+jZN0G0Azo4=
+github.com/windlant/protocol v1.2.3/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
+github.com/windlant/protocol v1.2.4 h1:JtkCpnP+FMENqENX9gbO0Jodyv15m4SoDnB8TIKvY/0=
+github.com/windlant/protocol v1.2.4/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
+github.com/windlant/protocol v1.2.7 h1:Ac6C7n/BNyPbm2K8W+QNVuWgLqVFnNmAAz7fHVokJVY=
+github.com/windlant/protocol v1.2.7/go.mod h1:NpNvSpaobHP/F0iNft7H/69CVXoQ9PoU6/gf32xQKCA=
 golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5 h1:y/woIyUBFbpQGKS0u1aHF/40WUDnek3fPOyD08H5Vng=
 golang.org/x/sys v0.0.0-20220310020820-b874c991c1a5/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

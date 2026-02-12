@@ -13,16 +13,16 @@ import (
 )
 
 // ToolClient 是工具调用的统一接口，支持本地或远程（如 stdio、HTTP）实现
-type ToolClient interface {
-	// Call 调用指定名称的工具，并传入参数
-	Call(name string, args tools_types.ToolArguments) (string, error)
+// type ToolClient interface {
+// 	// Call 调用指定名称的工具，并传入参数
+// 	Call(name string, args tools_types.ToolArguments) (string, error)
 
-	// List 返回所有可用工具的定义
-	List() ([]tools_types.ToolDefinition, error)
+// 	// List 返回所有可用工具的定义
+// 	List() ([]tools_types.ToolDefinition, error)
 
-	// Close 释放资源（如关闭子进程或网络连接）
-	Close() error
-}
+// 	// Close 释放资源（如关闭子进程或网络连接）
+// 	Close() error
+// }
 
 // ErrToolNotFound 表示请求的工具未注册或不存在
 var ErrToolNotFound = errors.New("tool not found")
@@ -54,17 +54,17 @@ type AggregatedToolClient struct {
 
 // 工具包装器，包含客户端和其工具列表
 type remoteToolWrapper struct {
-	client ToolClient
+	client *remote.RemoteToolClient
 	tools  map[string]tools_types.ToolDefinition
 }
 
 type localToolWrapper struct {
-	client ToolClient
+	client *local.LocalToolClient
 	tools  map[string]tools_types.ToolDefinition
 }
 
 type stdioToolWrapper struct {
-	client ToolClient
+	client *stdio.StdioToolClient
 	tools  map[string]tools_types.ToolDefinition
 }
 
@@ -99,7 +99,8 @@ func (a *AggregatedToolClient) initRemoteClient() error {
 	// 检查是否配置了远程服务器
 	if a.cfg.Tools.MCPServer.Host != "" && a.cfg.Tools.MCPServer.Port != 0 {
 		url := fmt.Sprintf("%s:%d/mcp", a.cfg.Tools.MCPServer.Host, a.cfg.Tools.MCPServer.Port)
-		client := remote.NewRemoteToolClient(url)
+		// 传入 agent_id 到 RemoteToolClient
+		client := remote.NewRemoteToolClient(url, a.cfg.Agent.ID)
 
 		tools, err := client.List()
 		if err != nil {
@@ -110,9 +111,23 @@ func (a *AggregatedToolClient) initRemoteClient() error {
 			client: client,
 			tools:  toolsToMap(tools),
 		}
-		fmt.Printf("✓ 远程工具客户端已配置: %s\n", url)
+		fmt.Printf("✓ 远程工具客户端已配置: %s (agent_id: %s)\n", url, a.cfg.Agent.ID)
+	} else if a.cfg.Tools.URL != "" {
+		// 支持直接配置完整的 URL
+		client := remote.NewRemoteToolClient(a.cfg.Tools.URL, a.cfg.Agent.ID)
+
+		tools, err := client.List()
+		if err != nil {
+			return fmt.Errorf("failed to list remote tools from %s: %w", a.cfg.Tools.URL, err)
+		}
+
+		a.remoteClient = &remoteToolWrapper{
+			client: client,
+			tools:  toolsToMap(tools),
+		}
+		fmt.Printf("✓ 远程工具客户端已配置: %s (agent_id: %s)\n", a.cfg.Tools.URL, a.cfg.Agent.ID)
 	} else {
-		fmt.Println("⚠ 远程工具客户端未配置（缺少 host 或 port）")
+		fmt.Println("⚠ 远程工具客户端未配置（缺少 host/port 或 url）")
 	}
 
 	return nil
@@ -257,4 +272,11 @@ func (a *AggregatedToolClient) Close() error {
 	}
 
 	return lastErr
+}
+
+// GetToolSource 返回指定工具名称对应的来源（remote / local / stdio）
+// 如果工具不存在，返回空字符串和 false
+func (a *AggregatedToolClient) GetToolSource(name string) (ToolSource, bool) {
+	source, exists := a.toolToSource[name]
+	return source, exists
 }

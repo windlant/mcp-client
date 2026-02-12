@@ -10,6 +10,7 @@ import (
 	"github.com/windlant/mcp-client/internal/agent"
 	"github.com/windlant/mcp-client/internal/config"
 	"github.com/windlant/mcp-client/internal/model"
+	"github.com/windlant/mcp-client/internal/skills"
 	"github.com/windlant/mcp-client/internal/tools"
 )
 
@@ -27,7 +28,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var tc tools.ToolClient
+	var tc *tools.AggregatedToolClient
 
 	// 如果工具启用，创建聚合工具客户端
 	if cfg.Tools.Enabled {
@@ -47,7 +48,18 @@ func main() {
 		}
 	}
 
-	a := agent.NewAgent(m, cfg.Context.MaxHistory, cfg.Tools.Enabled, tc)
+	// 创建 Skill Client（从配置加载 LLM-driven skills）
+	skillClient := skills.NewIntegratedClient(cfg)
+
+	// 显示技能信息
+	skillNames := skillClient.ListSkills()
+	if len(skillNames) > 0 {
+		fmt.Printf("✓ 已加载 %d 个本地技能\n", len(skillNames))
+	} else {
+		fmt.Println("⚠ 未加载任何本地技能")
+	}
+
+	a := agent.NewAgent(m, cfg.Context.MaxHistory, cfg.Tools.Enabled, tc, skillClient)
 
 	fmt.Println("MCP 客户端已启动！")
 	if cfg.Tools.Enabled {

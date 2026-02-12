@@ -16,7 +16,7 @@ type LocalToolClient struct {
 // NewLocalToolClient 创建并初始化一个本地工具客户端，预注册内置工具（如 get_time）
 func NewLocalToolClient() *LocalToolClient {
 	r := registry.NewRegistry()
-	r.Register(builtin.GetTimeToolDef)
+	r.Register(builtin.AskToolDef)
 	return &LocalToolClient{registry: r}
 }
 
