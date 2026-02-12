@@ -25,8 +25,15 @@ type ContextConfig struct {
 }
 
 type ToolsConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Mode    string `yaml:"mode"`
+	Enabled   bool            `yaml:"enabled"`
+	Mode      string          `yaml:"mode"`
+	URL       string          `yaml:"url"`
+	MCPServer MCPServerConfig `yaml:"mcp_server"`
+}
+
+type MCPServerConfig struct {
+	Host string `yaml:"host"`
+	Port int    `yaml:"port"`
 }
 
 func Load() (*Config, error) {

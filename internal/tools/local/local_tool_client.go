@@ -3,9 +3,9 @@ package local
 import (
 	"fmt"
 
-	"github.com/windlant/mcp-client/internal/tools"
 	"github.com/windlant/mcp-client/internal/tools/manage/builtin"
 	"github.com/windlant/mcp-client/internal/tools/manage/registry"
+	"github.com/windlant/protocol/types/tools_types"
 )
 
 // LocalToolClient 是一个本地工具客户端，直接在进程内执行注册的工具
@@ -21,7 +21,7 @@ func NewLocalToolClient() *LocalToolClient {
 }
 
 // Call 根据名称调用已注册的工具，并传入参数
-func (c *LocalToolClient) Call(name string, args tools.ToolArguments) (string, error) {
+func (c *LocalToolClient) Call(name string, args tools_types.ToolArguments) (string, error) {
 	def, ok := c.registry.Get(name)
 	if !ok {
 		return "", fmt.Errorf("tool not found: %s", name)
@@ -30,7 +30,7 @@ func (c *LocalToolClient) Call(name string, args tools.ToolArguments) (string, e
 }
 
 // List 返回所有已注册工具的定义列表
-func (c *LocalToolClient) List() ([]tools.ToolDefinition, error) {
+func (c *LocalToolClient) List() ([]tools_types.ToolDefinition, error) {
 	return c.registry.ListAll(), nil
 }
 
@@ -40,6 +40,6 @@ func (c *LocalToolClient) Close() error {
 }
 
 // GetDefinition 根据名称获取工具定义，若不存在则返回 false
-func (c *LocalToolClient) GetDefinition(name string) (tools.ToolDefinition, bool) {
+func (c *LocalToolClient) GetDefinition(name string) (tools_types.ToolDefinition, bool) {
 	return c.registry.Get(name)
 }

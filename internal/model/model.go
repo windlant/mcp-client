@@ -1,6 +1,6 @@
 package model
 
-import "github.com/windlant/mcp-client/internal/protocol"
+import "github.com/windlant/protocol/protocol/llm_protocol"
 
 // ToolForAPI 表示 LLM API（如 DeepSeek、OpenAI）所期望的工具格式
 type ToolForAPI struct {
@@ -18,12 +18,12 @@ type ToolFuncDef struct {
 // Model 是所有大语言模型后端的统一接口
 type Model interface {
 	// Chat 处理不使用工具的标准对话
-	Chat(messages []protocol.Message) (string, error)
+	Chat(messages []llm_protocol.Message) (string, error)
 
 	// ChatWithTools 处理支持工具调用的对话
 	// 实现时应：
 	// - 如果模型支持，使用 'tools' 引导模型行为
 	// - 返回模型生成的 tool_calls
 	// - 对于不支持工具的模型，返回空的 toolCalls，并按普通对话处理
-	ChatWithTools(messages []protocol.Message, tools []ToolForAPI) (content string, toolCalls []protocol.ToolCall, err error)
+	ChatWithTools(messages []llm_protocol.Message, tools []ToolForAPI) (content string, toolCalls []llm_protocol.ToolCall, err error)
 }

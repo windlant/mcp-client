@@ -5,17 +5,18 @@ import (
 	"fmt"
 
 	"github.com/windlant/mcp-client/internal/model"
-	"github.com/windlant/mcp-client/internal/protocol"
 	"github.com/windlant/mcp-client/internal/tools"
+	"github.com/windlant/protocol/protocol/llm_protocol"
+	"github.com/windlant/protocol/types/tools_types"
 )
 
 // Agent 是智能对话代理，负责管理对话历史、调用模型和工具
 type Agent struct {
-	model        model.Model        // 使用的语言模型
-	toolClient   tools.ToolClient   // 工具客户端（用于调用外部功能）
-	history      []protocol.Message // 对话历史记录
-	maxMessages  int                // 最大保存的历史消息数（不含 system 消息）
-	toolsEnabled bool               // 是否启用工具调用功能
+	model        model.Model            // 使用的语言模型
+	toolClient   tools.ToolClient       // 工具客户端（用于调用外部功能）
+	history      []llm_protocol.Message // 对话历史记录
+	maxMessages  int                    // 最大保存的历史消息数（不含 system 消息）
+	toolsEnabled bool                   // 是否启用工具调用功能
 }
 
 // NewAgent 创建一个新的智能代理
@@ -30,7 +31,7 @@ func NewAgent(m model.Model, maxHistory int, toolsEnabled bool, toolClient tools
 	return &Agent{
 		model:        m,
 		toolClient:   toolClient,
-		history:      make([]protocol.Message, 0),
+		history:      make([]llm_protocol.Message, 0),
 		maxMessages:  maxHistory,
 		toolsEnabled: toolsEnabled,
 	}
@@ -64,7 +65,7 @@ func (a *Agent) trimHistory() {
 
 		// 重新组合：保留 system + 最新的消息
 		if systemIdx >= 0 {
-			a.history = append([]protocol.Message{a.history[systemIdx]}, trimmed...)
+			a.history = append([]llm_protocol.Message{a.history[systemIdx]}, trimmed...)
 		} else {
 			a.history = trimmed
 		}
@@ -76,7 +77,7 @@ func (a *Agent) trimHistory() {
 func (a *Agent) Chat(input string) (string, error) {
 	// 如果是第一次对话，添加 system 提示
 	if len(a.history) == 0 {
-		systemMsg := protocol.Message{
+		systemMsg := llm_protocol.Message{
 			Role:    "system",
 			Content: "You are a helpful assistant.",
 		}
@@ -84,7 +85,7 @@ func (a *Agent) Chat(input string) (string, error) {
 	}
 
 	// 添加用户消息
-	a.history = append(a.history, protocol.Message{
+	a.history = append(a.history, llm_protocol.Message{
 		Role:    "user",
 		Content: input,
 	})
@@ -105,7 +106,7 @@ func (a *Agent) Chat(input string) (string, error) {
 	maxRounds := 5
 	for round := 0; round < maxRounds; round++ {
 		var content string
-		var toolCalls []protocol.ToolCall
+		var toolCalls []llm_protocol.ToolCall
 		var err error
 
 		// 调用模型，可能返回文本内容或工具调用请求
@@ -115,7 +116,7 @@ func (a *Agent) Chat(input string) (string, error) {
 		}
 
 		// 构造助手的回复消息（可能包含工具调用）
-		assistantMsg := protocol.Message{
+		assistantMsg := llm_protocol.Message{
 			Role:      "assistant",
 			Content:   content,
 			ToolCalls: toolCalls,
@@ -134,7 +135,7 @@ func (a *Agent) Chat(input string) (string, error) {
 			var args map[string]interface{}
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
 				// 参数解析失败，记录错误
-				a.history = append(a.history, protocol.Message{
+				a.history = append(a.history, llm_protocol.Message{
 					Role:       "tool",
 					Name:       tc.Function.Name,
 					ToolCallID: tc.ID,
@@ -147,7 +148,7 @@ func (a *Agent) Chat(input string) (string, error) {
 			result, err := a.toolClient.Call(tc.Function.Name, args)
 			if err != nil {
 				// 工具执行失败，记录错误
-				a.history = append(a.history, protocol.Message{
+				a.history = append(a.history, llm_protocol.Message{
 					Role:       "tool",
 					Name:       tc.Function.Name,
 					ToolCallID: tc.ID,
@@ -157,7 +158,7 @@ func (a *Agent) Chat(input string) (string, error) {
 			}
 
 			// 工具成功执行，记录结果
-			a.history = append(a.history, protocol.Message{
+			a.history = append(a.history, llm_protocol.Message{
 				Role:       "tool",
 				Name:       tc.Function.Name,
 				ToolCallID: tc.ID,
@@ -177,11 +178,11 @@ func (a *Agent) Chat(input string) (string, error) {
 
 // ClearHistory 清空对话历史（重置上下文）
 func (a *Agent) ClearHistory() {
-	a.history = make([]protocol.Message, 0)
+	a.history = make([]llm_protocol.Message, 0)
 }
 
 // convertToolDefsToAPI 将内部工具定义转换为模型 API 所需的格式
-func convertToolDefsToAPI(defs []tools.ToolDefinition) []model.ToolForAPI {
+func convertToolDefsToAPI(defs []tools_types.ToolDefinition) []model.ToolForAPI {
 	apiTools := make([]model.ToolForAPI, len(defs))
 	for i, def := range defs {
 		// 构建参数属性

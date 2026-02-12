@@ -11,8 +11,6 @@ import (
 	"github.com/windlant/mcp-client/internal/config"
 	"github.com/windlant/mcp-client/internal/model"
 	"github.com/windlant/mcp-client/internal/tools"
-	"github.com/windlant/mcp-client/internal/tools/local"
-	"github.com/windlant/mcp-client/internal/tools/stdio"
 )
 
 func main() {
@@ -31,26 +29,21 @@ func main() {
 
 	var tc tools.ToolClient
 
-	// 根据配置选择工具调用模式：local（直接调用）或 stdio（子进程服务器）
+	// 如果工具启用，创建聚合工具客户端
 	if cfg.Tools.Enabled {
-		switch cfg.Tools.Mode {
-		case "local":
-			tc = local.NewLocalToolClient()
-			fmt.Println("使用本地工具客户端（直接函数调用）。")
+		var err error
+		tc, err = tools.NewAggregatedToolClient(cfg)
+		if err != nil {
+			log.Fatalf("创建聚合工具客户端失败: %v", err)
+		}
 
-		case "stdio":
-			serverBinary := "./cmd/mcp_server_local/mcp-server-local"
-			tc, err = stdio.NewStdioToolClient(serverBinary)
-			if err != nil {
-				log.Fatalf("启动 stdio 工具客户端失败: %v", err)
-			}
-			defer func() {
-				_ = tc.Close()
-			}()
-			fmt.Println("使用 stdio 工具客户端（子进程 MCP 服务器）。")
+		defer func() {
+			_ = tc.Close()
+		}()
 
-		default:
-			log.Fatalf("不支持的工具模式: %s。支持的模式: local, stdio", cfg.Tools.Mode)
+		// 显示工具信息
+		if toolsList, err := tc.List(); err == nil {
+			fmt.Printf("✓ 已加载 %d 个工具（优先级: remote > local > stdio）\n", len(toolsList))
 		}
 	}
 
@@ -58,7 +51,7 @@ func main() {
 
 	fmt.Println("MCP 客户端已启动！")
 	if cfg.Tools.Enabled {
-		fmt.Printf("工具调用: 已启用 (模式: %s)\n", cfg.Tools.Mode)
+		fmt.Println("工具调用: 已启用（聚合模式）")
 	} else {
 		fmt.Println("工具调用: 已禁用")
 	}

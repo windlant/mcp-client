@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/windlant/mcp-client/internal/protocol"
-	"github.com/windlant/mcp-client/internal/tools"
+	"github.com/windlant/protocol/protocol/mcp_protocol"
+	"github.com/windlant/protocol/types/tools_types"
 )
 
 // StdioToolClient 通过子进程的 stdin/stdout 与 MCP 工具服务器通信
@@ -68,9 +68,9 @@ func (c *StdioToolClient) sendRequest(req interface{}) ([]byte, error) {
 }
 
 // Call 调用指定名称的工具，并传入参数
-func (c *StdioToolClient) Call(name string, args tools.ToolArguments) (string, error) {
-	req := protocol.MCPToolCallRequest{
-		Method: protocol.MCPMethodCallTool,
+func (c *StdioToolClient) Call(name string, args tools_types.ToolArguments) (string, error) {
+	req := mcp_protocol.MCPToolCallRequest{
+		Method: mcp_protocol.MCPMethodCallTool,
 		Name:   name,
 		Args:   args,
 	}
@@ -80,7 +80,7 @@ func (c *StdioToolClient) Call(name string, args tools.ToolArguments) (string, e
 		return "", err
 	}
 
-	var resp protocol.MCPToolCallResponse
+	var resp mcp_protocol.MCPToolCallResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return "", fmt.Errorf("failed to parse tool call response: %w", err)
 	}
@@ -93,9 +93,9 @@ func (c *StdioToolClient) Call(name string, args tools.ToolArguments) (string, e
 }
 
 // List 获取服务器支持的所有工具定义
-func (c *StdioToolClient) List() ([]tools.ToolDefinition, error) {
-	req := protocol.MCPListToolsRequest{
-		Method: protocol.MCPMethodListTools,
+func (c *StdioToolClient) List() ([]tools_types.ToolDefinition, error) {
+	req := mcp_protocol.MCPListToolsRequest{
+		Method: mcp_protocol.MCPMethodListTools,
 	}
 
 	respBytes, err := c.sendRequest(req)
@@ -103,7 +103,7 @@ func (c *StdioToolClient) List() ([]tools.ToolDefinition, error) {
 		return nil, fmt.Errorf("failed to send list_tools request: %w", err)
 	}
 
-	var resp protocol.MCPListToolsResponse
+	var resp mcp_protocol.MCPListToolsResponse
 	if err := json.Unmarshal(respBytes, &resp); err != nil {
 		return nil, fmt.Errorf("failed to parse list_tools response: %w", err)
 	}

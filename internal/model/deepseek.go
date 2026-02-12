@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/windlant/mcp-client/internal/config"
-	"github.com/windlant/mcp-client/internal/protocol"
+	"github.com/windlant/protocol/protocol/llm_protocol"
 )
 
 // DeepSeekModel 是对接 DeepSeek API 的模型实现
@@ -34,7 +34,7 @@ func NewDeepSeekModel(cfg *config.Config) (Model, error) {
 }
 
 // Chat 发送普通对话消息（不使用工具），返回模型的文本回复
-func (d *DeepSeekModel) Chat(messages []protocol.Message) (string, error) {
+func (d *DeepSeekModel) Chat(messages []llm_protocol.Message) (string, error) {
 	// 准备请求体
 	reqBody := map[string]interface{}{
 		"model":    d.modelName,
@@ -95,7 +95,7 @@ func (d *DeepSeekModel) Chat(messages []protocol.Message) (string, error) {
 }
 
 // ChatWithTools 发送支持工具调用的对话请求，返回文本内容和工具调用列表
-func (d *DeepSeekModel) ChatWithTools(messages []protocol.Message, tools []ToolForAPI) (string, []protocol.ToolCall, error) {
+func (d *DeepSeekModel) ChatWithTools(messages []llm_protocol.Message, tools []ToolForAPI) (string, []llm_protocol.ToolCall, error) {
 	reqBody := map[string]interface{}{
 		"model":    d.modelName,
 		"messages": messages,
@@ -136,8 +136,8 @@ func (d *DeepSeekModel) ChatWithTools(messages []protocol.Message, tools []ToolF
 	var apiResp struct {
 		Choices []struct {
 			Message struct {
-				Content   string              `json:"content"`
-				ToolCalls []protocol.ToolCall `json:"tool_calls,omitempty"`
+				Content   string                  `json:"content"`
+				ToolCalls []llm_protocol.ToolCall `json:"tool_calls,omitempty"`
 			} `json:"message"`
 		} `json:"choices"`
 	}

@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/windlant/mcp-client/internal/protocol"
-	"github.com/windlant/mcp-client/internal/tools"
 	"github.com/windlant/mcp-client/internal/tools/manage/builtin"
 	"github.com/windlant/mcp-client/internal/tools/manage/registry"
+	"github.com/windlant/protocol/protocol/mcp_protocol"
+	"github.com/windlant/protocol/types/tools_types"
 )
 
 // Server 用于处理 MCP 请求
@@ -42,9 +42,9 @@ func (s *Server) HandleRequest(requestBytes []byte) ([]byte, error) {
 	}
 
 	switch method {
-	case protocol.MCPMethodListTools:
+	case mcp_protocol.MCPMethodListTools:
 		return s.handleListTools()
-	case protocol.MCPMethodCallTool:
+	case mcp_protocol.MCPMethodCallTool:
 		// 对于 call_tool 请求，需要工具名称和参数
 		name, ok := rawReq["name"].(string)
 		if !ok {
@@ -64,7 +64,7 @@ func (s *Server) HandleRequest(requestBytes []byte) ([]byte, error) {
 		}
 
 		// 转换为工具所需的参数类型
-		args := tools.ToolArguments(argsMap)
+		args := tools_types.ToolArguments(argsMap)
 
 		return s.handleCallTool(name, args)
 	default:
@@ -77,9 +77,9 @@ func (s *Server) handleListTools() ([]byte, error) {
 	defs := s.reg.ListAll()
 
 	// 构造工具定义列表，注意：Function 字段不能被序列化（会变成 null）
-	toolDefs := make([]tools.ToolDefinition, len(defs))
+	toolDefs := make([]tools_types.ToolDefinition, len(defs))
 	for i, def := range defs {
-		toolDefs[i] = tools.ToolDefinition{
+		toolDefs[i] = tools_types.ToolDefinition{
 			Name:        def.Name,
 			Description: def.Description,
 			Parameters:  def.Parameters,
@@ -87,7 +87,7 @@ func (s *Server) handleListTools() ([]byte, error) {
 		}
 	}
 
-	response := protocol.MCPListToolsResponse{
+	response := mcp_protocol.MCPListToolsResponse{
 		Tools: toolDefs,
 	}
 
@@ -100,7 +100,7 @@ func (s *Server) handleListTools() ([]byte, error) {
 }
 
 // handleCallTool 执行指定名称的工具，并传入给定的参数
-func (s *Server) handleCallTool(name string, args tools.ToolArguments) ([]byte, error) {
+func (s *Server) handleCallTool(name string, args tools_types.ToolArguments) ([]byte, error) {
 	if name == "" {
 		return s.createErrorResponse("tool name is required")
 	}
@@ -115,7 +115,7 @@ func (s *Server) handleCallTool(name string, args tools.ToolArguments) ([]byte, 
 		return s.createErrorResponse(fmt.Sprintf("tool execution failed: %v", err))
 	}
 
-	response := protocol.MCPToolCallResponse{
+	response := mcp_protocol.MCPToolCallResponse{
 		Result: result,
 	}
 
@@ -129,7 +129,7 @@ func (s *Server) handleCallTool(name string, args tools.ToolArguments) ([]byte, 
 
 // createErrorResponse 生成一个符合协议格式的错误响应
 func (s *Server) createErrorResponse(message string) ([]byte, error) {
-	errorResponse := protocol.MCPToolCallResponse{
+	errorResponse := mcp_protocol.MCPToolCallResponse{
 		Error:  message,
 		Result: "", // 出错时确保 result 字段为空
 	}
