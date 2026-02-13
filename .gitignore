@@ -32,3 +32,6 @@ config/config.yaml
 # Build artifacts
 mcp-client
 cmd/mcp_server_local/mcp-server-local
+
+# skills
+internal/skills/manage/builtin/llm_driven_skills/specs/*.md
