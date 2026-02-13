@@ -28,7 +28,7 @@ func NewA2AClient() *A2AClient {
 	}
 }
 
-// CreateTask 向目标 agent 发送 task 请求，先接收 taskID，然后阻塞等待任务结果
+// CreateTask 向目标 agent 发送 task 请求，返回 taskID，然后通过查询endpoint阻塞等待结果
 func (c *A2AClient) CreateTask(ctx context.Context, targetAgent agent_types.AgentCard, skillID string, input skill_types.SkillArguments) (*a2a_protocol.TaskResult, error) {
 	// 构造 CreateTaskRequest
 	req := a2a_protocol.CreateTaskRequest{
@@ -60,14 +60,37 @@ func (c *A2AClient) CreateTask(ctx context.Context, targetAgent agent_types.Agen
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// 先接收 CreateTaskResponse（包含 taskID）
+	// 接收 CreateTaskResponse（包含 taskID）
 	var createResp a2a_protocol.CreateTaskResponse
 	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
 		return nil, fmt.Errorf("failed to decode task response: %w", err)
 	}
 	log.Printf("Task created with ID: %s\n", createResp.TaskID)
 
-	// 再接收 TaskResult（服务器阻塞等待任务完成后返回）
+	// 通过查询端点阻塞等待任务结果
+	return c.GetTaskResult(ctx, targetAgent, createResp.TaskID)
+}
+
+// GetTaskResult 向目标 agent 查询指定 taskID 的执行结果，阻塞等待直到完成
+func (c *A2AClient) GetTaskResult(ctx context.Context, targetAgent agent_types.AgentCard, taskID string) (*a2a_protocol.TaskResult, error) {
+	// 发送查询请求到 /tasks/{taskID} endpoint
+	url := targetAgent.URL + a2a_protocol.TasksPath + "/" + taskID
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create http request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	// 接收并返回 TaskResult
 	var result a2a_protocol.TaskResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("failed to decode task result: %w", err)

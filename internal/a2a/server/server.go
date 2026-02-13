@@ -21,7 +21,8 @@ func Start(addr string, registrar *registry.Registrar, skillClient *skills.Integ
 	mux := http.NewServeMux()
 	mux.HandleFunc("/registry/webhook", wh.HandleNotification)
 	mux.HandleFunc("/health", hh.HandleHealth)
-	mux.HandleFunc("/tasks", th.HandleCreateTask)
+	mux.HandleFunc("POST /tasks", th.HandleCreateTask)
+	mux.HandleFunc("GET /tasks/{taskID}", th.HandleGetTaskResult)
 
 	srv := &http.Server{
 		Addr:    addr,
