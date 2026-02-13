@@ -94,7 +94,7 @@ func main() {
 			ctx = context.Background()
 		}
 		if val := ctx.Value(skills.ContextAgentKey); val != nil {
-			if execAgent, ok := val.(*agent.Agent); len(execAgent.GetHistory()) > 0 && ok {
+			if execAgent, ok := val.(*agent.Agent); len(execAgent.GetHistory()) == 0 && ok {
 				return execAgent.ChatWithContext(ctx, prompt)
 			}
 		}
