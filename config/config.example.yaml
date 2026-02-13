@@ -1,15 +1,67 @@
+# Model settings
 model:
   provider: "deepseek"
-  api_key: "your_deepseek_api_key_here"
   model_name: "deepseek-chat"
   temperature: 0.7
   max_tokens: 1024
+  api_key:
 
+# Context management
 context:
-  max_history: 20
+  max_history: 100
 
+# Tool settings
 tools:
   enabled: true
   mcp_server:
     host: "http://192.168.88.128"
-    port:  44444
+    port: 44444
+
+# Registry settings
+registry:
+  registry_server:
+    host: "http://192.168.88.128"
+    port: 44443
+
+# Agent settings
+agent:
+  # Agent 基本信息（用于 A2A AgentCard）
+  id: "my-agent-v1"
+  name: "My Personal Assistant"
+  description: "A personal assistant that can help with various tasks using both LLM-driven and code-driven skills."
+
+  # 本地 Skills 配置
+  skills:
+    llm_driven:
+    - name: "make_time_cake"
+      description: "制作一个带有当前时间的蛋糕。注意：调用此技能只会获得详细的制作说明书，你需要严格按照说明书的步骤执行"
+      parameters:
+        type: object
+        properties:
+          my_idea:
+            type: string
+            description: "你自行构思的创意点子，之后你需要参考这个创意点子来制作蛋糕。"
+        required: [my_idea]
+      
+      # - name: "flight_search"
+      #   description: "Search for available flights between two cities"
+      #   parameters:
+      #     type: "object"
+      #     properties:
+      #       origin:
+      #         type: "string"
+      #         description: "Departure city"
+      #       destination:
+      #         type: "string"
+      #         description: "Arrival city"
+      #       date:
+      #         type: "string"
+      #         description: "Travel date in YYYY-MM-DD format"
+      #     required: ["origin", "destination", "date"]
+
+  # A2A 协议相关设置
+  a2a:
+    enabled: false
+    host: "192.168.88.129"
+    port: 8080
+    well_known_path: "/.well-known/agent.json"

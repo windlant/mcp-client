@@ -110,8 +110,9 @@ func main() {
 	agentFactory := func() *agent.Agent {
 		return agent.NewAgent(m, cfg.Context.MaxHistory, cfg.Tools.Enabled, tc, skillClient)
 	}
-	_ = a2aserver.Start(addr, registrar, skillClient, agentFactory)
-
+	if cfg.Agent.A2A.Enabled {
+		_ = a2aserver.Start(addr, registrar, skillClient, agentFactory)
+	}
 	// 构建本地 AgentCard
 	baseAgentURL := cfg.Agent.A2A.Host
 	if !strings.HasPrefix(baseAgentURL, "http") {
