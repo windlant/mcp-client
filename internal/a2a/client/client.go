@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -65,7 +64,7 @@ func (c *A2AClient) CreateTask(ctx context.Context, targetAgent agent_types.Agen
 	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
 		return nil, fmt.Errorf("failed to decode task response: %w", err)
 	}
-	log.Printf("Task created with ID: %s\n", createResp.TaskID)
+	// log.Printf("Task created with ID: %s\n", createResp.TaskID)
 
 	// 通过查询端点阻塞等待任务结果
 	return c.GetTaskResult(ctx, targetAgent, createResp.TaskID)
@@ -96,7 +95,7 @@ func (c *A2AClient) GetTaskResult(ctx context.Context, targetAgent agent_types.A
 		return nil, fmt.Errorf("failed to decode task result: %w", err)
 	}
 
-	log.Printf("Task %s completed: %v\n", result.TaskID, result)
+	// log.Printf("Task %s completed: %v\n", result.TaskID, result)
 	return &result, nil
 }
 

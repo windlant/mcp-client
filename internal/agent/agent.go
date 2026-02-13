@@ -53,6 +53,10 @@ func NewAgent(m model.Model, maxHistory int, toolsEnabled bool, toolClient *tool
 	return agent
 }
 
+func (a *Agent) GetHistory() []llm_protocol.Message {
+	return a.history
+}
+
 // initializeToolClassification 初始化并分类工具
 func (a *Agent) initializeToolClassification() {
 	// 获取所有工具
