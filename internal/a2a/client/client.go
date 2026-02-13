@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/windlant/protocol/protocol/a2a_protocol"
 	"github.com/windlant/protocol/types/agent_types"
@@ -17,14 +19,16 @@ type A2AClient struct {
 	httpClient *http.Client
 }
 
-// NewA2AClient 创建新的 A2A client
+// NewA2AClient 创建新的 A2A client，设置 10 分钟超时
 func NewA2AClient() *A2AClient {
 	return &A2AClient{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{
+			Timeout: 10 * time.Minute,
+		},
 	}
 }
 
-// CreateTask 向目标 agent 发送 task 请求，并等待执行结果
+// CreateTask 向目标 agent 发送 task 请求，先接收 taskID，然后阻塞等待任务结果
 func (c *A2AClient) CreateTask(ctx context.Context, targetAgent agent_types.AgentCard, skillID string, input skill_types.SkillArguments) (*a2a_protocol.TaskResult, error) {
 	// 构造 CreateTaskRequest
 	req := a2a_protocol.CreateTaskRequest{
@@ -56,12 +60,20 @@ func (c *A2AClient) CreateTask(ctx context.Context, targetAgent agent_types.Agen
 		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	// 解析响应
+	// 先接收 CreateTaskResponse（包含 taskID）
+	var createResp a2a_protocol.CreateTaskResponse
+	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+		return nil, fmt.Errorf("failed to decode task response: %w", err)
+	}
+	log.Printf("Task created with ID: %s\n", createResp.TaskID)
+
+	// 再接收 TaskResult（服务器阻塞等待任务完成后返回）
 	var result a2a_protocol.TaskResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, fmt.Errorf("failed to decode task result: %w", err)
 	}
 
+	log.Printf("Task %s completed: %v\n", result.TaskID, result)
 	return &result, nil
 }
 

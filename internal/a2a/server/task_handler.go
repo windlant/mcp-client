@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/windlant/protocol/protocol/a2a_protocol"
 )
@@ -46,7 +47,30 @@ func (h *TaskHandler) HandleCreateTask(w http.ResponseWriter, r *http.Request) {
 	// 异步执行 task，得到 taskID
 	taskID, _ := h.taskManager.CreateTask(req.AgentID, req.SkillID, req.Input)
 
+	// 设置响应头
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
+	
+	// 先返回 CreateTaskResponse（包含 taskID）
 	_ = json.NewEncoder(w).Encode(a2a_protocol.CreateTaskResponse{TaskID: taskID})
+	
+	// 阻塞等待任务完成（使用 10 分钟超时）
+	result, err := h.taskManager.GetTaskResult(taskID, 10*time.Minute)
+	if err != nil {
+		// 任务获取失败，返回错误响应
+		_ = json.NewEncoder(w).Encode(a2a_protocol.TaskResult{
+			TaskID:   taskID,
+			Success:  false,
+			Artifact: nil,
+			Error:    err.Error(),
+		})
+		h.taskManager.CleanupCompletedTask(taskID)
+		return
+	}
+	
+	// 返回完整的 TaskResult
+	_ = json.NewEncoder(w).Encode(result)
+	
+	// 清理已完成的任务
+	h.taskManager.CleanupCompletedTask(taskID)
 }
