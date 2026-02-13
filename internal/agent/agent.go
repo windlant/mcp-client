@@ -1,8 +1,10 @@
 package agent
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/windlant/mcp-client/internal/model"
@@ -148,6 +150,11 @@ func (a *Agent) trimHistory() {
 // Chat 处理用户输入并返回助手的回复
 // 支持多轮工具调用（最多 10 轮）
 func (a *Agent) Chat(input string) (string, error) {
+	return a.ChatWithContext(context.Background(), input)
+}
+
+// ChatWithContext 与 Chat 等价，但允许调用方传入 base context（用于传递绑定的 Agent 等）
+func (a *Agent) ChatWithContext(baseCtx context.Context, input string) (string, error) {
 	// 如果是第一次对话，添加 system 提示
 	if len(a.history) == 0 {
 		systemMsg := llm_protocol.Message{
@@ -179,7 +186,7 @@ func (a *Agent) Chat(input string) (string, error) {
 		// 调用模型，可能返回文本内容或工具调用请求
 		content, toolCalls, err = a.model.ChatWithTools(a.history, apiTools)
 		if err != nil {
-			return "", fmt.Errorf("failed to call model: %w", err)
+			return "", fmt.Errorf("failed to call model: %w\n", err)
 		}
 
 		// 构造助手的回复消息（可能包含工具调用）
@@ -195,7 +202,7 @@ func (a *Agent) Chat(input string) (string, error) {
 		if len(toolCalls) == 0 {
 			return content, nil
 		}
-
+		log.Printf("模型请求调用工具: %v", toolCalls)
 		// 执行每个工具调用
 		for _, tc := range toolCalls {
 			// 解析工具参数（JSON 字符串转为 map）
@@ -220,7 +227,13 @@ func (a *Agent) Chat(input string) (string, error) {
 			} else {
 				// 尝试调用 Skill（优先）
 				if _, isSkill := a.skillClient.GetSkill(tc.Function.Name); isSkill {
-					result, callErr = a.skillClient.Call(tc.Function.Name, skill_types.SkillArguments(args))
+					// 将当前 Agent 放入 context 以便 executor 获取并保持/隔离上下文
+					ctx := baseCtx
+					if ctx == nil {
+						ctx = context.Background()
+					}
+					ctx = context.WithValue(ctx, skills.ContextAgentKey, a)
+					result, callErr = a.skillClient.Call(ctx, tc.Function.Name, skill_types.SkillArguments(args))
 				} else {
 					// 调用 Tool（通过聚合客户端）
 					result, callErr = a.toolClient.Call(tc.Function.Name, args)

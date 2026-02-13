@@ -10,10 +10,11 @@ import (
 
 // Config 表示完整的应用程序配置
 type Config struct {
-	Model   ModelConfig   `yaml:"model"`
-	Context ContextConfig `yaml:"context"`
-	Tools   ToolsConfig   `yaml:"tools"`
-	Agent   AgentConfig   `yaml:"agent"`
+	Model    ModelConfig    `yaml:"model"`
+	Context  ContextConfig  `yaml:"context"`
+	Tools    ToolsConfig    `yaml:"tools"`
+	Agent    AgentConfig    `yaml:"agent"`
+	Registry RegistryConfig `yaml:"registry"`
 }
 
 // ModelConfig 表示大语言模型设置
@@ -86,6 +87,14 @@ type A2AConfig struct {
 	Host          string `yaml:"host"`            // A2A 服务监听主机
 	Port          int    `yaml:"port"`            // A2A 服务监听端口
 	WellKnownPath string `yaml:"well_known_path"` // AgentCard 路径
+}
+
+// RegistryConfig 表示注册中心相关配置
+type RegistryConfig struct {
+	RegistryServer struct {
+		Host string `yaml:"host"`
+		Port int    `yaml:"port"`
+	} `yaml:"registry_server"`
 }
 
 // Load 从 YAML 文件加载配置
