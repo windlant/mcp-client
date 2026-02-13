@@ -50,7 +50,7 @@ func (h *WebhookHandler) HandleNotification(w http.ResponseWriter, r *http.Reque
 			if h.skillClient != nil {
 				h.skillClient.RegisterRemoteAgentSkills(*notif.AgentCard)
 			}
-			log.Printf("Webhook: updated agent %s", notif.AgentID)
+			// log.Printf("Webhook: updated agent %s", notif.AgentID)
 		}
 	case registry_protocol.NotificationTypeAgentDeregistered:
 		h.registrar.Remove(notif.AgentID)
@@ -58,7 +58,7 @@ func (h *WebhookHandler) HandleNotification(w http.ResponseWriter, r *http.Reque
 		if h.skillClient != nil {
 			h.skillClient.UnregisterRemoteAgentSkills(notif.AgentID)
 		}
-		log.Printf("Webhook: removed agent %s", notif.AgentID)
+		// log.Printf("Webhook: removed agent %s", notif.AgentID)
 	default:
 		log.Printf("Webhook: unknown notification type %s", notif.Type)
 	}
